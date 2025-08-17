@@ -1,7 +1,13 @@
-import { assertIsPost, error, getCarbonServiceRole } from "@carbon/auth";
+import {
+  assertIsPost,
+  error,
+  getCarbonServiceRole,
+  VERCEL_URL,
+} from "@carbon/auth";
 import { requirePermissions } from "@carbon/auth/auth.server";
 import { flash } from "@carbon/auth/session.server";
 import { validationError, validator } from "@carbon/form";
+import { notifyIssueCreated } from "@carbon/integrations/notifications";
 import { getLocalTimeZone, today } from "@internationalized/date";
 import { useLoaderData } from "@remix-run/react";
 import { FunctionRegion } from "@supabase/supabase-js";
@@ -20,6 +26,7 @@ import {
 import IssueForm from "~/modules/quality/ui/Issue/IssueForm";
 
 import { getNextSequence } from "~/modules/settings";
+import { getCompanyIntegrations } from "~/modules/settings/settings.server";
 import { setCustomFields } from "~/utils/form";
 import type { Handle } from "~/utils/handle";
 import { path } from "~/utils/path";
@@ -52,7 +59,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export async function action({ request }: ActionFunctionArgs) {
   assertIsPost(request);
-  const { companyId, userId } = await requirePermissions(request, {
+  const { client, companyId, userId } = await requirePermissions(request, {
     create: "quality",
   });
 
@@ -122,6 +129,29 @@ export async function action({ request }: ActionFunctionArgs) {
       await flash(request, error("Failed to create tasks"))
     );
   }
+
+  try {
+    const integrations = await getCompanyIntegrations(client, companyId);
+    await notifyIssueCreated(
+      { client, serviceRole },
+      integrations,
+      {
+        companyId,
+        userId,
+        carbonUrl: `${VERCEL_URL || "http://localhost:3000"}${path.to.issue(ncrId)}`,
+        issue: {
+          id: ncrId,
+          nonConformanceId: nextSequence.data,
+          title: validation.data.name,
+          description: validation.data.description,
+          severity: validation.data.priority,
+        },
+      }
+    );
+  } catch (error) {
+    console.error("Failed to send notifications:", error);
+  }
+
   throw redirect(path.to.issue(ncrId!));
 }
 

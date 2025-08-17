@@ -1,5 +1,6 @@
 import { requirePermissions } from "@carbon/auth/auth.server";
-import { OnshapeClient, Onshape as OnshapeConfig } from "@carbon/integrations";
+import { Onshape as OnshapeConfig } from "@carbon/integrations";
+import { OnshapeClient } from "@carbon/integrations/onshape";
 import type { ShouldRevalidateFunction } from "@remix-run/react";
 import type { LoaderFunctionArgs } from "@vercel/remix";
 import { json } from "@vercel/remix";
@@ -64,7 +65,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     let offset = 0;
     let allDocuments: Array<{ id: string; name: string }> = [];
 
-    while (true) {
+    while (true && offset < 100) {
       const response = await onshapeClient.getElements(did, vid, limit, offset);
 
       if (!response || response.length === 0) {

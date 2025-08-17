@@ -92,15 +92,13 @@ export const useWorkCenters = (args: {
             .filter((f) => {
               if (processId && locationId) {
                 return (
-                  // @ts-ignore
-                  (f.processes ?? []).map((p) => p.id).includes(processId) &&
+                  (f.processes ?? []).includes(processId) &&
                   f.locationId === locationId
                 );
               }
 
               if (processId) {
-                // @ts-ignore
-                return (f.processes ?? []).map((p) => p.id).includes(processId);
+                return (f.processes ?? []).includes(processId);
               }
 
               if (locationId) {

@@ -320,14 +320,36 @@ serve(async (req: Request) => {
             // @ts-ignore -- content is json
             Object.keys(nonConformance.data?.content ?? {}).length === 0
           ) {
-            console.log("updating workflow content");
-            await trx
-              .updateTable("nonConformance")
-              .set({
-                content: workflow?.data?.content ?? {},
-              })
-              .where("id", "=", id)
-              .execute();
+            // @ts-ignore -- content is json
+            const contentFromWorkflow = workflow?.data?.content?.content ?? [];
+            const insertedContent = {
+              type: "doc",
+              content: contentFromWorkflow,
+            };
+
+            if (nonConformance.data?.description) {
+              insertedContent.content.unshift({
+                type: "paragraph",
+                content: [
+                  { type: "text", text: nonConformance.data?.description },
+                ],
+              });
+            }
+
+            console.log({
+              description: nonConformance.data?.description,
+              insertedContent,
+            });
+
+            if (insertedContent.content.length > 0) {
+              await trx
+                .updateTable("nonConformance")
+                .set({
+                  content: JSON.stringify(insertedContent),
+                })
+                .where("id", "=", id)
+                .execute();
+            }
           }
 
           if (investigationTaskInserts.length > 0) {

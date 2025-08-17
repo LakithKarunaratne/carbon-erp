@@ -1,14 +1,16 @@
-import { json, type ActionFunctionArgs } from "@vercel/remix";
-
-import { assertIsPost, error } from "@carbon/auth";
+import { assertIsPost, error, VERCEL_URL } from "@carbon/auth";
 import { requirePermissions } from "@carbon/auth/auth.server";
 import { flash } from "@carbon/auth/session.server";
+import { notifyTaskStatusChanged } from "@carbon/integrations/notifications";
+import { json, type ActionFunctionArgs } from "@vercel/remix";
 import type { IssueInvestigationTask } from "~/modules/quality";
 import { updateIssueTaskStatus } from "~/modules/quality";
+import { getCompanyIntegrations } from "~/modules/settings/settings.server";
+import { path } from "~/utils/path";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   assertIsPost(request);
-  const { client, userId } = await requirePermissions(request, {
+  const { client, userId, companyId } = await requirePermissions(request, {
     update: "quality",
   });
 
@@ -40,6 +42,29 @@ export async function action({ request, params }: ActionFunctionArgs) {
       {},
       await flash(request, error(update.error, "Failed to update status"))
     );
+  }
+
+  try {
+    const integrations = await getCompanyIntegrations(client, companyId);
+    if (update.data?.nonConformanceId) {
+      await notifyTaskStatusChanged({ client }, integrations, {
+        companyId,
+        userId,
+        carbonUrl: `${VERCEL_URL}${path.to.issue(
+          update.data.nonConformanceId
+        )}`,
+        task: {
+          id,
+          status,
+          issueId: update.data.nonConformanceId,
+          title: "",
+          type,
+        },
+      });
+    }
+  } catch (error) {
+    console.error("Failed to sync task to Slack:", error);
+    // Continue without blocking the main operation
   }
 
   return json({});

@@ -310,7 +310,7 @@ export async function getIssues(
 
   if (args) {
     query = setGenericQueryFilters(query, args, [
-      { column: "name", ascending: false },
+      { column: "nonConformanceId", ascending: false },
     ]);
   }
 
@@ -862,7 +862,9 @@ export async function updateIssueTaskStatus(
   return client
     .from(table)
     .update({ status, updatedBy: userId, assignee: finalAssignee })
-    .eq("id", id);
+    .eq("id", id)
+    .select("nonConformanceId")
+    .single();
 }
 
 export async function upsertGauge(
@@ -993,7 +995,6 @@ export async function upsertIssue(
         customFields?: Json;
       })
 ) {
-  console.log({ nonConformance });
   if ("createdBy" in nonConformance) {
     const result = await client
       .from("nonConformance")
